@@ -34,6 +34,7 @@ We are excited to introduce **Wan2.2**, a major upgrade to our foundational vide
 
 ## 🔥 Latest News!!
 
+* Sep 19, 2025: 💃 We introduct **[Wan2.2-Animate-14B](https://humanaigc.github.io/wan-animate)**, an unified model for character animation and replacement with holistic movement and expression replication. We released the [model weights](#model-download) and [inference code](#run-with-wan-animate). And you can try it on [wan.video](https://wan.video/).
 * Aug 26, 2025: 🎵 We introduce **[Wan2.2-S2V-14B](https://humanaigc.github.io/wan-s2v-webpage)**, an audio-driven cinematic video generation model, including [inference code](#run-speech-to-video-generation), [model weights](#model-download), and [technical report](https://humanaigc.github.io/wan-s2v-webpage/content/wan-s2v.pdf)! Now you can try it on [wan.video](https://wan.video/),  [ModelScope Gradio](https://www.modelscope.cn/studios/Wan-AI/Wan2.2-S2V) or [HuggingFace Gradio](https://huggingface.co/spaces/Wan-AI/Wan2.2-S2V)!
 * Jul 28, 2025: 👋 We have open a [HF space](https://huggingface.co/spaces/Wan-AI/Wan-2.2-5B) using the TI2V-5B model. Enjoy!
 * Jul 28, 2025: 👋 Wan2.2 has been integrated into ComfyUI ([CN](https://docs.comfy.org/zh-CN/tutorials/video/wan/wan2_2) | [EN](https://docs.comfy.org/tutorials/video/wan/wan2_2)). Enjoy!
@@ -71,6 +72,11 @@ If your research or project builds upon [**Wan2.1**](https://github.com/Wan-Vide
     - [x] Checkpoints of Wan2.2-S2V-14B
     - [x] ComfyUI integration
     - [x] Diffusers integration
+- Wan2.2-Animate Character Animation and Replacement
+    - [x] Inference code of Wan2.2-Animate
+    - [x] Checkpoints of Wan2.2-Animate
+    - [x] ComfyUI integration
+    - [ ] Diffusers integration    
 
 ## Run Wan2.2
 
@@ -99,6 +105,7 @@ pip install -r requirements_s2v.txt
 | I2V-A14B    | 🤗 [Huggingface](https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B)    🤖 [ModelScope](https://modelscope.cn/models/Wan-AI/Wan2.2-I2V-A14B)    | Image-to-Video MoE model, supports 480P & 720P |
 | TI2V-5B     | 🤗 [Huggingface](https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B)     🤖 [ModelScope](https://modelscope.cn/models/Wan-AI/Wan2.2-TI2V-5B)     | High-compression VAE, T2V+I2V, supports 720P |
 | S2V-14B     | 🤗 [Huggingface](https://huggingface.co/Wan-AI/Wan2.2-S2V-14B)     🤖 [ModelScope](https://modelscope.cn/models/Wan-AI/Wan2.2-S2V-14B)     | Speech-to-Video model, supports 480P & 720P |
+| Animate-14B | 🤗 [Huggingface](https://huggingface.co/Wan-AI/Wan2.2-Animate-14B) 🤖 [ModelScope](https://www.modelscope.cn/models/Wan-AI/Wan2.2-Animate-14B)  | Character animation and replacement | |
 
 
 
@@ -275,6 +282,75 @@ torchrun --nproc_per_node=8 generate.py --task s2v-14B --size 1024*704 --ckpt_di
 > 💡The `--pose_video` parameter enables pose-driven generation, allowing the model to follow specific pose sequences while generating videos synchronized with audio input.
 
 > 💡The `--num_clip` parameter controls the number of video clips generated, useful for quick preview with shorter generation time.
+
+Please visit our project page to see more examples and learn about the scenarios suitable for this model.
+
+#### Run Wan-Animate 
+
+Wan-Animate takes a video and a character image as input, and generates a video in either "animation" or "replacement" mode. 
+
+1. animation mode： The model generates a video of the character image that mimics the human motion in the input video.
+2. replacement mode: The model replaces the character image with the input video.
+
+Please visit our [project page](https://humanaigc.github.io/wan-animate) to see more examples and learn about the scenarios suitable for this model.
+
+##### (1) Preprocessing 
+The input video should be preprocessed into several materials before be feed into the inference process.  Please refer to the following processing flow, and more details about preprocessing can be found in [UserGuider](https://github.com/Wan-Video/Wan2.2/blob/main/wan/modules/animate/preprocess/UserGuider.md).
+
+* For animation
+```bash
+python ./wan/modules/animate/preprocess/preprocess_data.py \
+    --ckpt_path ./Wan2.2-Animate-14B/process_checkpoint \
+    --video_path ./examples/wan_animate/animate/video.mp4 \
+    --refer_path ./examples/wan_animate/animate/image.jpeg \
+    --save_path ./examples/wan_animate/animate/process_results \
+    --resolution_area 1280 720 \
+    --retarget_flag \
+    --use_flux
+```
+* For replacement
+```bash
+python ./wan/modules/animate/preprocess/preprocess_data.py \
+    --ckpt_path ./Wan2.2-Animate-14B/process_checkpoint \
+    --video_path ./examples/wan_animate/replace/video.mp4 \
+    --refer_path ./examples/wan_animate/replace/image.jpeg \
+    --save_path ./examples/wan_animate/replace/process_results \
+    --resolution_area 1280 720 \
+    --iterations 3 \
+    --k 7 \
+    --w_len 1 \
+    --h_len 1 \
+    --replace_flag
+```
+##### (2) Run in animation mode 
+
+* Single-GPU inference 
+
+```bash
+python generate.py --task animate-14B --ckpt_dir ./Wan2.2-Animate-14B/ --src_root_path ./examples/wan_animate/animate/process_results/ --refert_num 1
+```
+
+* Multi-GPU inference using FSDP + DeepSpeed Ulysses
+
+```bash
+python -m torch.distributed.run --nnodes 1 --nproc_per_node 8 generate.py --task animate-14B --ckpt_dir ./Wan2.2-Animate-14B/ --src_root_path ./examples/wan_animate/animate/process_results/ --refert_num 1 --dit_fsdp --t5_fsdp --ulysses_size 8
+```
+
+##### (3) Run in replacement mode 
+
+* Single-GPU inference 
+
+```bash
+python generate.py --task animate-14B --ckpt_dir ./Wan2.2-Animate-14B/ --src_root_path ./examples/wan_animate/replace/process_results/ --refert_num 1 --replace_flag --use_relighting_lora 
+```
+
+* Multi-GPU inference using FSDP + DeepSpeed Ulysses
+
+```bash
+python -m torch.distributed.run --nnodes 1 --nproc_per_node 8 generate.py --task animate-14B --ckpt_dir ./Wan2.2-Animate-14B/ --src_root_path ./examples/wan_animate/replace/process_results/src_pose.mp4  --refert_num 1 --replace_flag --use_relighting_lora --dit_fsdp --t5_fsdp --ulysses_size 8
+```
+
+> 💡 If you're using **Wan-Animate**, we do not recommend using LoRA models trained on `Wan2.2`, since weight changes during training may lead to unexpected behavior.
 
 ## Computational Efficiency on Different GPUs
 

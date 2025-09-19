@@ -20,6 +20,7 @@ from wan.distributed.util import init_distributed_group
 from wan.utils.prompt_extend import DashScopePromptExpander, QwenPromptExpander
 from wan.utils.utils import merge_video_audio, save_video, str2bool
 
+
 EXAMPLE_PROMPT = {
     "t2v-A14B": {
         "prompt":
@@ -34,6 +35,12 @@ EXAMPLE_PROMPT = {
     "ti2v-5B": {
         "prompt":
             "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage.",
+    },
+    "animate-14B": {
+        "prompt": "视频中的人在做动作",
+        "video": "",
+        "pose": "",
+        "mask": "",
     },
     "s2v-14B": {
         "prompt":
@@ -215,6 +222,29 @@ def _parse_args():
         default=False,
         help="Whether to convert model paramerters dtype.")
 
+    # animate
+    parser.add_argument(
+        "--src_root_path",
+        type=str,
+        default=None,
+        help="The file of the process output path. Default None.")
+    parser.add_argument(
+        "--refert_num",
+        type=int,
+        default=77,
+        help="How many frames used for temporal guidance. Recommended to be 1 or 5."
+    )
+    parser.add_argument(
+        "--replace_flag",
+        action="store_true",
+        default=False,
+        help="Whether to use replace.")
+    parser.add_argument(
+        "--use_relighting_lora",
+        action="store_true",
+        default=False,
+        help="Whether to use relighting lora.")
+    
     # following args only works for s2v
     parser.add_argument(
         "--num_clip",
@@ -264,9 +294,7 @@ def _parse_args():
         default=80,
         help="Number of frames per clip, 48 or 80 or others (must be multiple of 4) for 14B s2v"
     )
-
     args = parser.parse_args()
-
     _validate_args(args)
 
     return args
@@ -424,6 +452,33 @@ def generate(args):
             guide_scale=args.sample_guide_scale,
             seed=args.base_seed,
             offload_model=args.offload_model)
+    elif "animate" in args.task:
+        logging.info("Creating Wan-Animate pipeline.")
+        wan_animate = wan.WanAnimate(
+            config=cfg,
+            checkpoint_dir=args.ckpt_dir,
+            device_id=device,
+            rank=rank,
+            t5_fsdp=args.t5_fsdp,
+            dit_fsdp=args.dit_fsdp,
+            use_sp=(args.ulysses_size > 1),
+            t5_cpu=args.t5_cpu,
+            convert_model_dtype=args.convert_model_dtype,
+            use_relighting_lora=args.use_relighting_lora
+        )
+
+        logging.info(f"Generating video ...")
+        video = wan_animate.generate(
+            src_root_path=args.src_root_path,
+            replace_flag=args.replace_flag,
+            refert_num = args.refert_num,
+            clip_len=args.frame_num,
+            shift=args.sample_shift,
+            sample_solver=args.sample_solver,
+            sampling_steps=args.sample_steps,
+            guide_scale=args.sample_guide_scale,
+            seed=args.base_seed,
+            offload_model=args.offload_model)
     elif "s2v" in args.task:
         logging.info("Creating WanS2V pipeline.")
         wan_s2v = wan.WanS2V(
@@ -458,7 +513,6 @@ def generate(args):
             offload_model=args.offload_model,
             init_first_frame=args.start_from_ref,
         )
-
     else:
         logging.info("Creating WanI2V pipeline.")
         wan_i2v = wan.WanI2V(
@@ -472,7 +526,6 @@ def generate(args):
             t5_cpu=args.t5_cpu,
             convert_model_dtype=args.convert_model_dtype,
         )
-
         logging.info("Generating video ...")
         video = wan_i2v.generate(
             args.prompt,
