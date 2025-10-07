@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CUDA_HOME=/usr/local/cuda \
     PIP_NO_CACHE_DIR=1
 
+
 # Base dependencies (including ffmpeg, libsndfile, ninja, cmake, and other build & audio dependencies)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget git tini ffmpeg libsndfile1 libgl1 libglib2.0-0 python3 python3-pip python3-dev \
@@ -15,10 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 
 # Set PYTHONPATH to include the workspace directory
-ENV PYTHONPATH=/workspace${PYTHONPATH:+:$PYTHONPATH}
+ENV PYTHONPATH=/workspace:/workspace/sam2_source${PYTHONPATH:+:$PYTHONPATH}
 
 # Copy current directory contents to workdir
 COPY . .
+
+# Clone SAM-2 repository and include submodules to get all necessary files
+RUN git clone --recurse-submodules https://github.com/facebookresearch/sam2.git /workspace/sam2_source && \
+    cd /workspace/sam2_source && \
+    git checkout 0e78a118995e66bb27d78518c4bd9a3e95b4e266 && \
+    cd /workspace && \
+    cp -r /workspace/sam2_source/sam2_configs /workspace/wan/configs/sam2_configs
 
 # Default sm_90 (H200 Hopper). For RTX 4090 (Ada), pass 8.9 at build time.
 ARG TORCH_CUDA_ARCH_LIST="7.5 8.0 8.6 8.9 9.0 12.0" 
@@ -31,7 +39,8 @@ RUN pip install --no-cache-dir setuptools wheel packaging && \
     pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 torch torchvision torchaudio && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r requirements_animate.txt && \
-    pip install --no-cache-dir "huggingface_hub[cli]"
+    pip install --no-cache-dir "huggingface_hub[cli]" && \
+    pip install -e /workspace/sam2_source
 
 # Align UID/GID with the host to avoid write permission issues
 ARG UID=1000
