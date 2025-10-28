@@ -7,12 +7,53 @@ import os.path as osp
 import shutil
 import subprocess
 
+import numpy as np
 import imageio
 import torch
 import torchvision
-
+from loguru import logger
+import filetype
+from PIL import Image
+import cv2
 __all__ = ['save_video', 'save_image', 'str2bool']
 
+
+def try_load_image(image_path):
+    if not os.path.exists(image_path):
+        logger.error("The file does not exist!")
+        return None
+    
+    file_size = os.path.getsize(image_path)
+    if file_size == 0:
+        logger.error("The file is empty!")
+        return None
+
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
+    file_ext = os.path.splitext(image_path)[1].lower()
+    if file_ext not in valid_extensions:
+        logger.warning(f"Unsupported format: {file_ext}")
+    kind = filetype.guess(image_path)
+    if kind is None:
+        logger.warning('Cannot guess file type!')
+
+    if "."+kind.extension != file_ext:
+        logger.warning(f"File extension: {file_ext} does not match image format: .{kind.extension}")
+
+    try:
+        img = cv2.imread(image_path)
+        if img is None:
+            logger.info("OpenCV failed to read the image, try to use PIL.")
+            img = Image.open(image_path)
+            img = np.array(img)
+            img = img[:, :, ::-1]
+            if img is None:
+                logger.error("PIL also failed to read the image.")
+                return None
+        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        return img
+    except Exception as e:
+        logger.error(f"Failed to load image: {e}")
+        return None
 
 def rand_name(length=8, suffix=''):
     name = binascii.b2a_hex(os.urandom(length)).decode('utf-8')

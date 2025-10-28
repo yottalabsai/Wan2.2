@@ -23,6 +23,10 @@ transformer.USE_FLASH_ATTN = False
 transformer.MATH_KERNEL_ON = True
 transformer.OLD_GPU = True
 from sam_utils import build_sam2_video_predictor
+import os, sys
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+sys.path.insert(0, repo_root)
+from wan.utils.utils import try_load_image
 
 
 class ProcessPipeline():
@@ -80,10 +84,10 @@ class ProcessPipeline():
                 face_images.append(face_image)
 
             logger.info(f"Processing reference image: {refer_image_path}")
-            refer_img = cv2.imread(refer_image_path)
+            refer_img = try_load_image(refer_image_path)
             src_ref_path = os.path.join(output_path, 'src_ref.png')
             shutil.copy(refer_image_path, src_ref_path)
-            refer_img = refer_img[..., ::-1]
+            # refer_img = refer_img[..., ::-1]
 
             refer_img = padding_resize(refer_img, height, width)
             logger.info(f"Processing template video: {video_path}")
@@ -125,10 +129,9 @@ class ProcessPipeline():
             return True
         else:
             logger.info(f"Processing reference image: {refer_image_path}")
-            refer_img = cv2.imread(refer_image_path)
+            refer_img = try_load_image(refer_image_path)
             src_ref_path = os.path.join(output_path, 'src_ref.png')
             shutil.copy(refer_image_path, src_ref_path)
-            refer_img = refer_img[..., ::-1]
             
             refer_img = resize_by_area(refer_img, resolution_area[0] * resolution_area[1], divisor=16)
             

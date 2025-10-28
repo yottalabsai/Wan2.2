@@ -1048,9 +1048,10 @@ def draw_pcd(pcd_list, save_path=None):
         plt.savefig("tmp.png")
 
 
-def load_image(img, reverse=False):
+def load_image(img, reverse=True):
     if type(img) == str:
-        img = cv2.imread(img)
+        # img = cv2.imread(img)
+        img = try_load_image(img)
     if reverse:
         img = img.astype(np.float32)
         img = img[:, :, ::-1]

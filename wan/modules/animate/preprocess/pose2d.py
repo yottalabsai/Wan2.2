@@ -6,7 +6,10 @@ from typing import Union, List
 import numpy as np
 import torch
 import onnxruntime
-
+import os, sys
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+sys.path.insert(0, repo_root)
+from wan.utils.utils import try_load_image
 from pose2d_utils import (
     read_img,
     box_convert_simple,
@@ -380,7 +383,7 @@ class Pose2d:
                 cap.release()
                 images = frames
             elif inputs.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
-                img = cv2.cvtColor(cv2.imread(inputs), cv2.COLOR_BGR2RGB)
+                img = try_load_image(inputs)
                 if img is None:
                     raise ValueError(f"Cannot read image: {inputs}")
                 images = [img]
